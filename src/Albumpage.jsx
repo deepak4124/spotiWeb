@@ -12,10 +12,11 @@ function Albumpage() {
     const [searchInput, setSearchInput] = useState(artistName);
     const [accessToken, setAccessToken] = useState("");
     const [albums, setAlbums] = useState([]);
+    const [relatedArtists, setRelatedArtists] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    // Fetch Spotify Access Token
     useEffect(() => {
-        console.log("Artist Name Received in Albumpage:", artistName); // Debugging
         if (!accessToken) {
             fetchAccessToken();
         }
@@ -43,9 +44,9 @@ function Albumpage() {
         }
     };
 
+    // Search for albums and related artists
     const search = async () => {
         setLoading(true);
-        console.log("Searching for:", searchInput);
 
         try {
             const artistResponse = await fetch(
@@ -73,6 +74,7 @@ function Albumpage() {
                 return;
             }
 
+            // Fetch albums
             const albumResponse = await fetch(
                 `https://api.spotify.com/v1/artists/${artistID}/albums?include_groups=album&market=ES&limit=50`,
                 {
@@ -91,6 +93,9 @@ function Albumpage() {
 
             const albumData = await albumResponse.json();
             setAlbums(albumData.items);
+
+            // Fetch related artists
+            fetchRelatedArtists(artistID);
         } catch (error) {
             console.error("Error performing search:", error);
         } finally {
@@ -98,6 +103,36 @@ function Albumpage() {
         }
     };
 
+    const fetchRelatedArtists = async (artistID) => {
+        try {
+            if (!artistID) {
+                console.error("Invalid artist ID for related artists.");
+                return;
+            }
+
+            const response = await fetch(
+                `https://api.spotify.com/v1/artists/${artistID}/related-artists`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                console.error("Error fetching related artists:", response.status);
+                return;
+            }
+
+            const data = await response.json();
+            setRelatedArtists(data.artists || []);
+        } catch (error) {
+            console.error("Error fetching related artists:", error);
+        }
+    };
+
+    // Trigger search when searchInput or accessToken changes
     useEffect(() => {
         if (searchInput && accessToken) {
             search();
@@ -105,9 +140,10 @@ function Albumpage() {
     }, [searchInput, accessToken]);
 
     return (
-        <div className="bg-stone-300 min-h-screen">
+        <div className="bg-stone-300 dark:bg-gray-900 dark:text-gray-200 min-h-screen">
             <NavBar />
-            <div className="p-4 sm:p-5 lg:p-10 scroll-auto">
+            <div className="p-4 sm:p-5 lg:p-10">
+                {/* Search Bar */}
                 <form
                     className="shadow-md p-4 mb-5"
                     onSubmit={(e) => {
@@ -138,15 +174,42 @@ function Albumpage() {
                         </button>
                     </div>
                 </form>
+
+                {/* Albums Section */}
                 {loading ? (
                     <div className="flex justify-center items-center mt-10">
-                        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 m-5">
-                        {albums.map((album, i) => (
-                            <Card key={i} album={album} />
-                        ))}
+                    <>
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Albums</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {albums.map((album, i) => (
+                                <Card key={i} album={album} accessToken={accessToken} />
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* Related Artists Section */}
+                {relatedArtists.length > 0 && (
+                    <div className="mt-10">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Related Artists</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {relatedArtists.map((artist) => (
+                                <div
+                                    key={artist.id}
+                                    className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 flex flex-col items-center"
+                                >
+                                    <img
+                                        src={artist.images[0]?.url}
+                                        alt={artist.name}
+                                        className="w-24 h-24 rounded-full object-cover mb-2"
+                                    />
+                                    <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{artist.name}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
